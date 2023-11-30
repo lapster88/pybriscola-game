@@ -1,21 +1,24 @@
+import copy
+import random
+
 import briscola.player as p
 import briscola.deck as d
 
 # Helper functions
 
-def best_card(self, cards, trump_suit):
+def trick_winner(trick, trump_suit):
     '''
     Determines the best card in cards based on the trump_suit. first card in the list is the secondary trump
-    :param cards: list of Card objects
+    :param trick:
     :param trump_suit: suit that can trump any other suit
     :return: Card object representing the best card in cards.
     '''
 
     # first card is winning unless we find a higher card in that suit or a trump suit card
+    cards = list(list(zip(*trick))[0])
     winning_card = cards[0]
     winning_card_idx = 0
-    for idx, card in enumerate(cards[1:]):
-
+    for idx, card in enumerate(cards):
         # found a trump card
         if card.suit == trump_suit:
 
@@ -55,6 +58,7 @@ class Game:
         self.partner_suit = None
         self.current_trick = []
         self.current_leader_id = None
+        self.current_player_id = None
 
         pass
 
@@ -95,11 +99,14 @@ class Game:
 
         hands = self.deck.deal_hands()
 
-        for hand, player in tuple(zip(hands, self.players)):
+        for hand, player in list(zip(hands, self.players)):
             player.hand = hand
+            player.original_hand = copy.deepcopy(hand)
             # TODO: send hand information to each client
 
         self.state = 'bid'
+
+        return self.state, hands
 
     def player_bid(self, player_id, amount):
         """Update game state with a player's bid.
@@ -122,12 +129,12 @@ class Game:
             self.bid = amount
             self.bid_winner = player
 
-        # TODO: send bid updates
-
         if self.bidding_complete():
-            # TODO: announce winning bid and bidder
             self.current_leader_id = self.bid_winner.id
+            self.current_player_id = self.bid_winner.id
             self.state = "call-partner-rank"
+
+        return self.state, self.bid_winner.id, self.bid
 
     def call_partner_rank(self, rank):
         if rank not in d.ranks:
@@ -138,9 +145,9 @@ class Game:
 
 
         self.partner_rank = rank
-        # TODO: announce the called rank
-
         self.state = 'play-first-hand'
+
+        return self.state, self.partner_rank
 
     def call_partner_suit(self, suit):
         if suit not in d.suits:
@@ -157,7 +164,7 @@ class Game:
 
         # search for partner
         for player in self.players:
-            for card in player.hand:
+            for card in player.original_hand:
                 if card == partner_card:
                     self.partner = player
                     break
@@ -170,30 +177,45 @@ class Game:
 
         self.state = 'play-hands'
 
-    def play_card(self, player_id, card):
-        self.players[player_id].hand.pop(card)
+        return self.state, self.partner_suit, self.partner.id
 
-        self.current_trick.append(card)
+    def play_card(self, player_id, card):
+        self.players[player_id].hand.remove(card)
+
+        self.current_trick.append((card, player_id))
+
+        self.current_player_id += 1
+        if self.current_player_id > 4:
+            self.current_player_id = 0
 
         # TODO: announce the card played
 
         if len(self.current_trick) == 5:
-            winning_card, winning_card_idx = best_card(self.current_trick)
+            winning_card, winning_card_idx = trick_winner(self.current_trick, self.partner_suit)
+            # find the winning player by going "around the table" from the leader to the idx of the winning card
+            winning_player_idx = self.current_trick[winning_card_idx][1]
+            print('winner is '+str(winning_card) + ' played by ' +str(winning_player_idx))
 
-            #find the winning player by going "around the table" from the leader to the idx of the winning card
-            leader_to_winner_dist = self.current_leader_id + winning_card_idx
-            winning_player_idx = leader_to_winner_dist if leader_to_winner_dist < 5 else leader_to_winner_dist - 5
-
-            #give winning player trick and update their points
+            # give winning player trick and update their points
             winning_player = self.players[winning_player_idx]
             winning_player.tricks_won.append(self.current_trick)
-            winning_player.points += sum([card.value for card in self.current_trick])
+            winning_player.points += sum([card.value for card, player_id in self.current_trick])
 
-            #reset state for next trick
+            # reset state for next trick
+            #print(self.current_trick)
             self.current_trick = []
             self.current_leader_id = winning_player_idx
+            self.current_player_id = winning_player_idx
+
+            if self.state == 'play-first-hand':
+                self.state = 'call-partner-suit'
 
             # TODO: announce trick winner and next leader
+    def _next_player_play_random_card(self):
+        card_idx = random.randint(0,4)
+        player = self.players[self.current_player_id]
+        print(str(player.id) + ' played ' + str(player.hand[card_idx]))
+        self.play_card(self.current_player_id, player.hand[card_idx])
 
 
 class GameStateError(Exception):

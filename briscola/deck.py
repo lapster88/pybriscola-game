@@ -13,7 +13,7 @@ class Card:
         return str(self.suit) + ',' + str(self.rank)
 
     def __eq__(self, other):
-        return (self.suit == other.suit) and (self.value == other.value)
+        return (self.suit == other.suit) and (self.rank == other.rank)
 
 class Deck:
     def __init__(self):

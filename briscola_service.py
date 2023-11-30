@@ -14,7 +14,9 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 class BriscolaService:
-
+    '''
+    this class is responsible for creating and managing games
+    '''
     def __init__(self):
         self.games = {}
         self.game_tasks = {}
