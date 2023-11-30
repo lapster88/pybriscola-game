@@ -15,10 +15,9 @@ def trick_winner(trick, trump_suit):
     '''
 
     # first card is winning unless we find a higher card in that suit or a trump suit card
-    cards = list(list(zip(*trick))[0])
-    winning_card = cards[0]
-    winning_card_idx = 0
-    for idx, card in enumerate(cards):
+    winning_card = trick[0][0]
+    winning_player_id = trick[0][1]
+    for card, player_id in trick:
         # found a trump card
         if card.suit == trump_suit:
 
@@ -28,12 +27,12 @@ def trick_winner(trick, trump_suit):
                 # assign winning card by rank
                 if card.rank > winning_card.rank:
                     winning_card = card
-                    winning_card_idx = idx
+                    winning_player_id = player_id
 
             # winning card is not a trump card, replace it
             else:
                 winning_card = card
-                winning_card_idx = idx
+                winning_player_id = player_id
 
         #found a card matching winning card suit
         elif card.suit == winning_card.suit:
@@ -41,9 +40,9 @@ def trick_winner(trick, trump_suit):
             #assign winning card by rank
             if card.rank > winning_card.rank:
                 winning_card = card
-                winning_card_idx = idx
+                winning_player_id = player_id
 
-    return winning_card, winning_card_idx
+    return winning_card, winning_player_id
 
 
 class Game:
@@ -191,9 +190,8 @@ class Game:
         # TODO: announce the card played
 
         if len(self.current_trick) == 5:
-            winning_card, winning_card_idx = trick_winner(self.current_trick, self.partner_suit)
+            winning_card, winning_player_idx = trick_winner(self.current_trick, self.partner_suit)
             # find the winning player by going "around the table" from the leader to the idx of the winning card
-            winning_player_idx = self.current_trick[winning_card_idx][1]
             print('winner is '+str(winning_card) + ' played by ' +str(winning_player_idx))
 
             # give winning player trick and update their points
