@@ -183,10 +183,6 @@ class Game:
 
         self.current_trick.append((card, player_id))
 
-        self.current_player_id += 1
-        if self.current_player_id > 4:
-            self.current_player_id = 0
-
         # TODO: announce the card played
 
         if len(self.current_trick) == 5:
@@ -207,6 +203,12 @@ class Game:
 
             if self.state == 'play-first-hand':
                 self.state = 'call-partner-suit'
+            else:
+                self.state = "hand-won"
+
+        else:
+            self._inc_current_player()
+            self.state = 'play-hands'
 
             # TODO: announce trick winner and next leader
     def _next_player_play_random_card(self):
@@ -215,6 +217,10 @@ class Game:
         print(str(player.id) + ' played ' + str(player.hand[card_idx]))
         self.play_card(self.current_player_id, player.hand[card_idx])
 
+    def _inc_current_player(self):
+        self.current_player_id += 1
+        if self.current_player_id > 4:
+            self.current_player_id = 0
 
 class GameStateError(Exception):
     def __init__(self, expected_state, actual_state):
