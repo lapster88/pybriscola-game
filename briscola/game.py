@@ -6,7 +6,7 @@ import briscola.deck as d
 
 # Helper functions
 
-def trick_winner(trick, trump_suit):
+def trick_winner(trick, trump_suit=None):
     '''
     Determines the best card in cards based on the trump_suit. first card in the list is the secondary trump
     :param trick:
@@ -58,6 +58,7 @@ class Game:
         self.current_trick = []
         self.current_leader_id = None
         self.current_player_id = None
+        self.minimum_hand_value = 5 # consider making this an arg in the future
 
         pass
 
@@ -66,6 +67,9 @@ class Game:
         Check to see if bidding is complete
         :return: True if bidding is  complete, False if it isn't
         '''
+
+        if self.bid < 61:
+            return False
 
         # reset number of passed players
         pass_count = 0
@@ -96,12 +100,17 @@ class Game:
         if self.state != 'ready':
             raise GameStateError('ready', self.state)
 
-        hands = self.deck.deal_hands()
+        hands_correct = False
 
-        for hand, player in list(zip(hands, self.players)):
-            player.hand = hand
-            player.original_hand = copy.deepcopy(hand)
-            # TODO: send hand information to each client
+        while not hands_correct:
+
+            hands = self.deck.deal_hands()
+
+            for hand, player in list(zip(hands, self.players)):
+                player.hand = hand
+                player.original_hand = copy.deepcopy(hand)
+
+            hands_correct = all([sum([card.value for card in player.hand]) >= self.minimum_hand_value for player in self.players])
 
         self.state = 'bid'
 
@@ -144,7 +153,7 @@ class Game:
 
 
         self.partner_rank = rank
-        self.state = 'play-first-hand'
+        self.state = 'play-first-trick'
 
         return self.state, self.partner_rank
 
@@ -174,43 +183,56 @@ class Game:
 
         print('partner is player ' + str(self.partner.id))
 
-        self.state = 'play-hands'
+        winning_card, winning_player_idx = trick_winner(self.current_trick, self.partner_suit)
+        self.end_trick(winning_card, winning_player_idx)
+
+        self.state = 'trick-won'
 
         return self.state, self.partner_suit, self.partner.id
 
-    def play_card(self, player_id, card):
-        self.players[player_id].hand.remove(card)
+    def end_trick(self, winning_card, winning_player_idx):
+        print('winner is ' + str(winning_card) + ' played by ' + str(winning_player_idx))
 
+        # give winning player trick and update their points
+        winning_player = self.players[winning_player_idx]
+        winning_player.tricks_won.append(self.current_trick)
+        winning_player.points += sum([card.value for card, player_id in self.current_trick])
+
+        # reset state for next trick
+        # print(self.current_trick)
+        self.current_trick = []
+        self.current_leader_id = winning_player_idx
+        self.current_player_id = winning_player_idx
+
+    def play_card(self, player_id, card):
+
+        # take card out of hand and put card in trick
+        self.players[player_id].hand.remove(card)
         self.current_trick.append((card, player_id))
 
-        # TODO: announce the card played
+        # identify the current winning card and player
+        winning_card, winning_player_idx = trick_winner(self.current_trick, self.partner_suit)
+        winning_player = self.players[winning_player_idx]
 
+        # the trick is complete
         if len(self.current_trick) == 5:
-            winning_card, winning_player_idx = trick_winner(self.current_trick, self.partner_suit)
-            # find the winning player by going "around the table" from the leader to the idx of the winning card
-            print('winner is '+str(winning_card) + ' played by ' +str(winning_player_idx))
 
-            # give winning player trick and update their points
-            winning_player = self.players[winning_player_idx]
-            winning_player.tricks_won.append(self.current_trick)
-            winning_player.points += sum([card.value for card, player_id in self.current_trick])
-
-            # reset state for next trick
-            #print(self.current_trick)
-            self.current_trick = []
-            self.current_leader_id = winning_player_idx
-            self.current_player_id = winning_player_idx
-
-            if self.state == 'play-first-hand':
+            # if it's the first hand, the bidder needs to call the suit to complete the trick
+            if self.state == 'play-first-trick':
                 self.state = 'call-partner-suit'
-            else:
-                self.state = "hand-won"
 
+            # it's not the first hand, handle normally
+            else:
+                self.state = 'trick-won'
+
+        # otherwise, keep playing
         else:
             self._inc_current_player()
-            self.state = 'play-hands'
+            self.state = 'play-tricks'
 
-            # TODO: announce trick winner and next leader
+        return self.state, winning_card, winning_player_idx
+
+
     def _next_player_play_random_card(self):
         card_idx = random.randint(0,4)
         player = self.players[self.current_player_id]
@@ -225,4 +247,9 @@ class Game:
 class GameStateError(Exception):
     def __init__(self, expected_state, actual_state):
         self.message = "State is {}, expected {}".format(expected_state, actual_state)
+        super().__init__(self.message)
+
+class GameError(Exception):
+    def __init__(self, message):
+        self.message = message
         super().__init__(self.message)
