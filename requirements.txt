@@ -1,0 +1,3 @@
+gevent>=22.10.2
+websockets>=10.4
+pyzmq>=25.1
