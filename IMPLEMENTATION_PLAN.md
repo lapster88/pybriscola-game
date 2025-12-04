@@ -14,7 +14,8 @@
 - Add durability (Option 1): after every successful `action.result`, persist full authoritative state to Redis (AOF enabled) keyed by `game:<id>:state`; optionally keep a short recent action log for debugging. On restart, reload state for a game_id, reattach, and emit a fresh `sync` to clients. Apply cleanup (TTL or delete) when a game ends, configurable per env (`GAME_STATE_TTL_SECONDS`, e.g., 1h dev, 12h prod).
 
 ## Integration with Web Layer
-- Define clean interface for pybriscola-web via Redis channels (`game.<game_id>.actions` / `game.<game_id>.events`); consume actions, emit events/snapshots.
+- Define clean interface for pybriscola-web via Redis channels (`game.<game_id>.actions` / `game.<game_id>.events`); per-game servers consume actions, emit events/snapshots.
+- Game service is responsible for creating/starting per-game servers and monitoring heartbeats; per-game servers handle all actions/events.
 - Trust envelopes signed by web (claims: `game_id`, `player_id`, `role`, action metadata) with `action_id`, `ts`, `version`, `origin`; no need to re-verify client JWTs.
 - Ensure observer mode never exposes hands.
 
